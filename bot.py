@@ -11,12 +11,11 @@ import time
 # НАСТРОЙКИ
 # ==========================================
 BOT_TOKEN = "9104960855:AAHa8wTH_Gq58lO-jUCTn4cnDIOR7lWZjMA"
-MANAGER_USERNAME = "pagerNft"     # Менеджер
-OWNER_USERNAME = "Slawua_shop"    # Владелец
+OWNER_USERNAME = "Slawua_shop"    # Владелец (все покупки идут сюда)
 REVIEWS_CHANNEL = "otzivi_slawua" # Канал с отзывами
 SUB_CHANNEL = "@Novosti_SlawuaShop" # Канал для подписки
 
-# ID ВЛАДЕЛЬЦА И МЕНЕДЖЕРА
+# ID ВЛАДЕЛЬЦА И МЕНЕДЖЕРА (для админки и рассылки)
 OWNER_ID = 8739809998
 MANAGER_ID = 7704432355
 
@@ -44,7 +43,6 @@ def init_db():
         )
     """)
     
-    # Добавляем тестовый промокод, если база пустая
     cur.execute("SELECT COUNT(*) FROM promocodes")
     if cur.fetchone()[0] == 0:
         cur.execute("INSERT INTO promocodes (code, discount, uses_left) VALUES (?, ?, ?)", ("SLAWUA", 10, 5))
@@ -310,7 +308,7 @@ def process_promo(message):
         cur.execute("UPDATE promocodes SET uses_left = uses_left - 1 WHERE code = ?", (code,))
         conn.commit()
         conn.close()
-        bot.send_message(message.chat.id, f"✅ Промокод <b>{code}</b> успешно активирован!\n🎁 Твоя скидка: <b>{discount}%</b>\n\nНапиши менеджеру @pagerNft и укажи этот промокод, чтобы получить скидку.", parse_mode="HTML", reply_markup=get_main_menu())
+        bot.send_message(message.chat.id, f"✅ Промокод <b>{code}</b> успешно активирован!\n🎁 Твоя скидка: <b>{discount}%</b>\n\nНапиши владельцу @Slawua_shop и укажи этот промокод, чтобы получить скидку.", parse_mode="HTML", reply_markup=get_main_menu())
     else:
         conn.close()
         bot.send_message(message.chat.id, "❌ Такого промокода нет или лимит активаций исчерпан.", reply_markup=get_main_menu())
@@ -344,13 +342,10 @@ def buy_nft(message):
         "• Юзернеймы.\n\n"
         "💵 <b>Условия:</b>\n"
         "Оценка происходит быстро, оплата моментальная.\n\n"
-        "Для оценки свяжитесь с нами:"
+        "Для оценки свяжитесь с владельцем:"
     )
     kb = types.InlineKeyboardMarkup(row_width=1)
-    kb.add(
-        types.InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{MANAGER_USERNAME}"),
-        types.InlineKeyboardButton("👑 Написать владельцу", url=f"https://t.me/{OWNER_USERNAME}")
-    )
+    kb.add(types.InlineKeyboardButton("👑 Написать владельцу", url=f"https://t.me/{OWNER_USERNAME}"))
     bot.send_message(message.chat.id, text, reply_markup=kb, parse_mode="HTML")
 
 @bot.message_handler(func=lambda msg: msg.text == "📜 Как купить?")
@@ -361,8 +356,8 @@ def how_to_buy(message):
     text = (
         "<b>📜 Инструкция по покупке</b>\n\n"
         "1. Выбери нужный аккаунт из списка.\n"
-        "2. Напиши менеджеру @pagerNft и укажи, что хочешь купить.\n"
-        "3. Менеджер подтвердит наличие и назовет цену.\n"
+        "2. Напиши владельцу @Slawua_shop и укажи, что хочешь купить.\n"
+        "3. Владелец подтвердит наличие и назовет цену.\n"
         "4. Оплати удобным способом.\n"
         "5. Получи данные от аккаунта и смени пароль.\n\n"
         "⚠️ <b>Гарантия:</b> 24 часа на вход."
@@ -402,11 +397,9 @@ def contact_seller(message):
         bot.send_message(message.chat.id, "⚠️ Для начала подпишись на канал!", reply_markup=sub_keyboard())
         return
     text = (
-        f"👤 <b>По всем вопросам покупки обращайтесь к нашему менеджеру.</b>\n\n"
-        f"Владелец магазина: @{OWNER_USERNAME}"
+        f"👤 <b>По всем вопросам покупки обращайтесь к владельцу магазина.</b>"
     )
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{MANAGER_USERNAME}"))
     kb.add(types.InlineKeyboardButton("👑 Написать владельцу", url=f"https://t.me/{OWNER_USERNAME}"))
     bot.send_message(message.chat.id, text, reply_markup=kb, parse_mode="HTML")
 
@@ -416,10 +409,10 @@ def show_regular(call):
         "<b>🌍 Обычные аккаунты (по странам)</b>\n\n"
         f"{ACCOUNTS_TEXT}\n"
         "──────────────────\n"
-        "Для покупки напиши менеджеру: @pagerNft"
+        "Для покупки напиши владельцу: @Slawua_shop"
     )
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{MANAGER_USERNAME}"))
+    kb.add(types.InlineKeyboardButton("👑 Написать владельцу", url=f"https://t.me/{OWNER_USERNAME}"))
     kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_shop"))
     bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=kb, parse_mode="HTML")
 
@@ -429,10 +422,10 @@ def show_unusual(call):
         "<b>✨ Необычные аккаунты (поштучно)</b>\n\n"
         f"{FAKE_IDS}\n"
         "──────────────────\n"
-        "Для покупки напиши менеджеру: @pagerNft"
+        "Для покупки напиши владельцу: @Slawua_shop"
     )
     kb = types.InlineKeyboardMarkup()
-    kb.add(types.InlineKeyboardButton("💬 Написать менеджеру", url=f"https://t.me/{MANAGER_USERNAME}"))
+    kb.add(types.InlineKeyboardButton("👑 Написать владельцу", url=f"https://t.me/{OWNER_USERNAME}"))
     kb.add(types.InlineKeyboardButton("🔙 Назад", callback_data="back_to_shop"))
     bot.edit_message_text(text, chat_id=call.message.chat.id, message_id=call.message.message_id, reply_markup=kb, parse_mode="HTML")
 
