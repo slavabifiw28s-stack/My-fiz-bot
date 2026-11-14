@@ -2,14 +2,17 @@ import telebot
 from telebot import types
 import sqlite3
 import time
+import os
+import threading
+from flask import Flask
 
 # ==========================================
 # НАСТРОЙКИ
 # ==========================================
 BOT_TOKEN = "9052843841:AAGZPiN0Zu4-QfZoQkXvLCZQo2y2aEfCaAg"
 DB_NAME = "giveaway.db"
-OWNER_ID = 7425512449  # Твой ID
-OWNER_USERNAME = "@killedrax"  # Твой юзернейм
+OWNER_ID = 7425512449
+OWNER_USERNAME = "@killedrax"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -53,14 +56,14 @@ def update_counter(chat_id, count, winners):
     conn.close()
 
 # ==========================================
-# ПРИЗЫ ПО КУБИКУ
+# ПРИЗЫ
 # ==========================================
 PRIZES = {
-    1: "🌹 Роза",
-    2: "💐 Букет",
+    1: "🌹 Роза", 
+    2: "💐 Букет", 
     3: "💍 Кольцо",
-    4: "🧸 Мишка",
-    5: "❤️ Сердце",
+    4: "🧸 Мишка", 
+    5: "❤️ Сердце", 
     6: "💎 Алмаз"
 }
 
@@ -87,7 +90,8 @@ def start_giveaway(message):
     text = (
         "🎁 <b>РОЗЫГРЫШ ЗАПУЩЕН!</b>\n\n"
         "Каждый <b>77-й комментарий</b> получает подарок!\n"
-        "Бот сам кинет кубик и определит, какой приз достанется победителю. 🎲"
+        "Бот сам кинет кубик и определит приз. 🎲\n\n"
+        "🔥 <b>Внимание:</b> если выпадет 6, победитель может получить <b>NFT-подарок</b>!"
     )
     msg = bot.send_message(message.chat.id, text, parse_mode="HTML")
     try:
@@ -97,7 +101,44 @@ def start_giveaway(message):
     activate_giveaway(message.chat.id)
 
 # ==========================================
-# СЧЕТЧИК СООБЩЕНИЙ
+# РУЧНАЯ ВЫДАЧА NFT (ТОЛЬКО ДЛЯ ВЛАДЕЛЬЦА)
+# ==========================================
+@bot.message_handler(commands=['give_nft'])
+def give_nft(message):
+    if message.from_user.id != OWNER_ID:
+        return
+        
+    try:
+        args = message.text.split()
+        if len(args) < 2:
+            bot.reply_to(message, "❌ Формат: /give_nft @username или ID\nПример: /give_nft @vasek122")
+            return
+            
+        target = args[1]
+        
+        text = (
+            f"🎁 <b>ПОЗДРАВЛЯЕМ!</b>\n\n"
+            f"Владелец магазина только что подарил тебе <b>NFT-подарок</b>!\n\n"
+            f"Напиши мне (@{OWNER_USERNAME}) в личку, и я передам тебе твой NFT."
+        )
+        
+        if target.startswith('@'):
+            bot.send_message(message.chat.id, f"✅ Уведомление отправлено пользователю {target}.", parse_mode="HTML")
+            # Отправляем в чат, где была команда
+            bot.send_message(message.chat.id, text, parse_mode="HTML")
+        else:
+            try:
+                target_id = int(target)
+                bot.send_message(target_id, text, parse_mode="HTML")
+                bot.reply_to(message, "✅ NFT успешно отправлен в личку пользователю!")
+            except Exception as e:
+                bot.reply_to(message, f"❌ Ошибка: {e}")
+                
+    except Exception as e:
+        bot.reply_to(message, f"❌ Ошибка: {e}")
+
+# ==========================================
+# СЧЕТЧИК
 # ==========================================
 @bot.message_handler(func=lambda message: True)
 def count_messages(message):
@@ -113,59 +154,74 @@ def count_messages(message):
     new_count = count + 1
     
     if new_count >= 77:
-        # 1. Фиксируем победителя и сбрасываем счетчик
         winners += 1
         update_counter(message.chat.id, 0, winners)
         
         winner_mention = f"@{message.from_user.username}" if message.from_user.username else message.from_user.first_name
+        winner_id = message.from_user.id
         
-        # 2. Бот кидает кубик
         dice_msg = bot.send_dice(message.chat.id, emoji="🎲")
-        
-        # 3. Ждем, пока кубик прокрутится (4 секунды)
         time.sleep(4)
         
-        # 4. Получаем значение кубика и приз
         dice_value = dice_msg.dice.value
-        prize = PRIZES.get(dice_value, "Неизвестный приз")
         
-        # 5. Пишем результат в чат
-        chat_text = (
-            f"🎉 <b>ПОБЕДИТЕЛЬ №{winners}!</b> 🎉\n\n"
-            f"77-й комментарий оставил: <b>{winner_mention}</b>!\n\n"
-            f"Кубик выбросил <b>{dice_value}</b>, и победитель получает:\n"
-            f"🎁 <b>{prize}</b>\n\n"
-            f"Владелец {OWNER_USERNAME} свяжется с тобой. Поздравляем!"
-        )
+        # Логика: если выпало 6, есть шанс получить NFT
+        if dice_value == 6:
+            prize = "💎 Алмаз + 🎁 NFT-подарок!"
+            chat_text = (
+                f"🎉 <b>ДЖЕКПОТ! ПОБЕДИТЕЛЬ №{winners}!</b> 🎉\n\n"
+                f"77-й комментарий оставил: <b>{winner_mention}</b>!\n\n"
+                f"Кубик выбросил <b>6</b>, и это значит, что победитель получает:\n"
+                f"🎁 <b>{prize}</b>\n\n"
+                f"Владелец {OWNER_USERNAME} свяжется с тобой для выдачи NFT!"
+            )
+        else:
+            prize = PRIZES.get(dice_value, "Неизвестный приз")
+            chat_text = (
+                f"🎉 <b>ПОБЕДИТЕЛЬ №{winners}!</b> 🎉\n\n"
+                f"77-й комментарий оставил: <b>{winner_mention}</b>!\n\n"
+                f"Кубик выбросил <b>{dice_value}</b>, и победитель получает:\n"
+                f"🎁 <b>{prize}</b>\n\n"
+                f"Владелец {OWNER_USERNAME} свяжется с тобой. Поздравляем!"
+            )
+            
         bot.send_message(message.chat.id, chat_text, parse_mode="HTML")
         
-        # 6. Закрепляем сообщение победителя
         try:
             bot.pin_chat_message(message.chat.id, message.message_id, disable_notification=False)
         except Exception:
             pass
             
-        # 7. Отправляем уведомление тебе в личку
         owner_text = (
-            f"🔔 <b>НОВЫЙ ПОБЕДИТЕЛЬ В ЧАТЕ!</b>\n\n"
+            f"🔔 <b>НОВЫЙ ПОБЕДИТЕЛЬ!</b>\n\n"
             f"Чат: <b>{message.chat.title}</b>\n"
-            f"Победитель: <b>{winner_mention}</b>\n"
-            f"Выпало число: <b>{dice_value}</b>\n"
+            f"Победитель: <b>{winner_mention}</b> (ID: <code>{winner_id}</code>)\n"
+            f"Выпало: <b>{dice_value}</b>\n"
             f"Приз: <b>{prize}</b>\n\n"
-            f"Зайди в чат и выдай подарок!"
+            f"Чтобы выдать ему NFT, напиши в чат:\n<code>/give_nft {winner_id}</code>"
         )
         try:
             bot.send_message(OWNER_ID, owner_text, parse_mode="HTML")
-        except Exception as e:
-            print(f"Не удалось отправить сообщение владельцу: {e}")
-
+        except Exception:
+            pass
     else:
         update_counter(message.chat.id, new_count, winners)
 
 # ==========================================
-# ЗАПУСК
+# ВЕБ-СЕРВЕР ДЛЯ RENDER
 # ==========================================
+app = Flask(__name__)
+
+@app.route('/')
+def health():
+    return "Bot is running"
+
+def run_flask():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
 if __name__ == "__main__":
     init_db()
-    print("Бот запущен. Жду 77 сообщений...")
+    print("Запуск бота и веб-сервера...")
+    threading.Thread(target=run_flask, daemon=True).start()
     bot.infinity_polling()
