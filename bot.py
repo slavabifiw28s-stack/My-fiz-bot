@@ -4,6 +4,7 @@ import sqlite3
 import time
 import os
 import threading
+import random
 from flask import Flask
 
 # ==========================================
@@ -91,7 +92,7 @@ def start_giveaway(message):
         "🎁 <b>РОЗЫГРЫШ ЗАПУЩЕН!</b>\n\n"
         "Каждый <b>77-й комментарий</b> получает подарок!\n"
         "Бот сам кинет кубик и определит приз. 🎲\n\n"
-        "🔥 <b>Внимание:</b> если выпадет 6, победитель может получить <b>NFT-подарок</b>!"
+        "🔥 <b>Внимание:</b> если выпадет 6, судьба решит, что ты получишь: Алмаз или <b>NFT-подарок</b>!"
     )
     msg = bot.send_message(message.chat.id, text, parse_mode="HTML")
     try:
@@ -124,7 +125,6 @@ def give_nft(message):
         
         if target.startswith('@'):
             bot.send_message(message.chat.id, f"✅ Уведомление отправлено пользователю {target}.", parse_mode="HTML")
-            # Отправляем в чат, где была команда
             bot.send_message(message.chat.id, text, parse_mode="HTML")
         else:
             try:
@@ -165,16 +165,26 @@ def count_messages(message):
         
         dice_value = dice_msg.dice.value
         
-        # Логика: если выпало 6, есть шанс получить NFT
+        # Логика: если выпало 6, рандомим между Алмазом и NFT
         if dice_value == 6:
-            prize = "💎 Алмаз + 🎁 NFT-подарок!"
-            chat_text = (
-                f"🎉 <b>ДЖЕКПОТ! ПОБЕДИТЕЛЬ №{winners}!</b> 🎉\n\n"
-                f"77-й комментарий оставил: <b>{winner_mention}</b>!\n\n"
-                f"Кубик выбросил <b>6</b>, и это значит, что победитель получает:\n"
-                f"🎁 <b>{prize}</b>\n\n"
-                f"Владелец {OWNER_USERNAME} свяжется с тобой для выдачи NFT!"
-            )
+            if random.choice([True, False]):
+                prize = "🎁 NFT-подарок!"
+                chat_text = (
+                    f"🎉 <b>ДЖЕКПОТ! ПОБЕДИТЕЛЬ №{winners}!</b> 🎉\n\n"
+                    f"77-й комментарий оставил: <b>{winner_mention}</b>!\n\n"
+                    f"Кубик выбросил <b>6</b>, и фортуна решила, что победитель получает:\n"
+                    f"🎁 <b>{prize}</b>\n\n"
+                    f"Владелец {OWNER_USERNAME} свяжется с тобой для выдачи NFT!"
+                )
+            else:
+                prize = "💎 Алмаз (без NFT)"
+                chat_text = (
+                    f"🎉 <b>ПОБЕДИТЕЛЬ №{winners}!</b> 🎉\n\n"
+                    f"77-й комментарий оставил: <b>{winner_mention}</b>!\n\n"
+                    f"Кубик выбросил <b>6</b>, но фортуна решила, что сегодня ты получаешь:\n"
+                    f"🎁 <b>{prize}</b>\n\n"
+                    f"Владелец {OWNER_USERNAME} свяжется с тобой."
+                )
         else:
             prize = PRIZES.get(dice_value, "Неизвестный приз")
             chat_text = (
@@ -198,8 +208,11 @@ def count_messages(message):
             f"Победитель: <b>{winner_mention}</b> (ID: <code>{winner_id}</code>)\n"
             f"Выпало: <b>{dice_value}</b>\n"
             f"Приз: <b>{prize}</b>\n\n"
-            f"Чтобы выдать ему NFT, напиши в чат:\n<code>/give_nft {winner_id}</code>"
         )
+        
+        if "NFT" in prize:
+            owner_text += f"⚠️ <b>ВНИМАНИЕ!</b> Выпал NFT. Чтобы выдать его, напиши:\n<code>/give_nft {winner_id}</code>"
+            
         try:
             bot.send_message(OWNER_ID, owner_text, parse_mode="HTML")
         except Exception:
