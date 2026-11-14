@@ -6,7 +6,7 @@ import time
 # ==========================================
 # НАСТРОЙКИ
 # ==========================================
-BOT_TOKEN = ""
+BOT_TOKEN = "9052843841:AAGZPiN0Zu4-QfZoQkXvLCZQo2y2aEfCaAg"
 DB_NAME = "giveaway.db"
 OWNER_ID = 7425512449  # Твой ID
 OWNER_USERNAME = "@killedrax"  # Твой юзернейм
